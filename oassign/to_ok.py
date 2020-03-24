@@ -19,6 +19,12 @@ TEST_HEADERS = ["TEST", "HIDDEN TEST"]
 ALLOWED_NAME = re.compile(r'[A-Za-z][A-Za-z0-9_]*')
 NB_VERSION = 4
 
+TEST_REGEX = r"##\s*(hidden\s*)?test\s*##"
+SOLUTION_REGEX = r"##\s*solution\s*##"
+MD_SOLUTION_REGEX = r"(<strong>|\*{2})solution:?(<\/strong>|\*{2})"
+
+MD_ANSWER_CELL_TEMPLATE = "_Type your answer here, replacing this text._"
+
 
 def convert_to_ok(nb_path, dir, args):
     """Convert a master notebook to an ok notebook, tests dir, and .ok file.
@@ -30,16 +36,16 @@ def convert_to_ok(nb_path, dir, args):
     ok_nb_path = dir / nb_path.name
     tests_dir = dir / 'tests'
     os.makedirs(tests_dir, exist_ok=True)
-    open(tests_dir / '__init__.py', 'a').close()
+    # open(tests_dir / '__init__.py', 'a').close()
 
     nb = nbformat.read(open(nb_path), NB_VERSION)
     ok_cells, manual_questions = gen_ok_cells(nb['cells'], tests_dir)
-    dot_ok_name = gen_dot_ok(ok_nb_path, args.endpoint)
-    init = gen_init_cell(dot_ok_name)
+    # dot_ok_name = gen_dot_ok(ok_nb_path, args.endpoint)
+    # init = gen_init_cell(dot_ok_name)
 
-    nb['cells'] = [init] + ok_cells
-    if not args.no_submit_cell:
-        nb['cells'] += gen_submit_cells(nb_path, manual_questions, args.instructions)
+    nb['cells'] = ok_cells #[init] + ok_cells
+    # if not args.no_submit_cell:
+    #     nb['cells'] += gen_submit_cells(nb_path, manual_questions, args.instructions)
     remove_output(nb)
 
     with open(ok_nb_path, 'w') as f:
@@ -47,61 +53,61 @@ def convert_to_ok(nb_path, dir, args):
     return ok_nb_path
 
 
-def gen_dot_ok(notebook_path, endpoint):
-    """Generate .ok file and return its name."""
-    assert notebook_path.suffix == '.ipynb', notebook_path
-    ok_path = notebook_path.with_suffix('.ok')
-    name = notebook_path.stem
-    src = [notebook_path.name]
-    with open(ok_path, 'w') as out:
-        json.dump({
-            "name": name,
-            "endpoint": endpoint,
-            "src": src,
-            "tests": {
-                "tests/q*.py": "ok_test"
-            },
-            "protocols": [
-                "file_contents",
-                "grading",
-                "backup"
-            ]
-            }, out)
-    return ok_path.name
+# def gen_dot_ok(notebook_path, endpoint):
+#     """Generate .ok file and return its name."""
+#     assert notebook_path.suffix == '.ipynb', notebook_path
+#     ok_path = notebook_path.with_suffix('.ok')
+#     name = notebook_path.stem
+#     src = [notebook_path.name]
+#     with open(ok_path, 'w') as out:
+#         json.dump({
+#             "name": name,
+#             "endpoint": endpoint,
+#             "src": src,
+#             "tests": {
+#                 "tests/q*.py": "ok_test"
+#             },
+#             "protocols": [
+#                 "file_contents",
+#                 "grading",
+#                 "backup"
+#             ]
+#             }, out)
+#     return ok_path.name
 
 
-def gen_init_cell(dot_ok_name):
-    """Generate a cell to initialize ok object."""
-    cell = nbformat.v4.new_code_cell()
-    cell.source = ("# Initialize OK\n"
-    "from client.api.notebook import Notebook\n"
-    "ok = Notebook('{}')".format(dot_ok_name))
-    lock(cell)
-    return cell
+# def gen_init_cell(dot_ok_name):
+#     """Generate a cell to initialize ok object."""
+#     cell = nbformat.v4.new_code_cell()
+#     cell.source = ("# Initialize OK\n"
+#     "from client.api.notebook import Notebook\n"
+#     "ok = Notebook('{}')".format(dot_ok_name))
+#     lock(cell)
+#     return cell
 
 
-def gen_submit_cells(nb_path, manual_questions, instruction_text):
-    """Generate submit cells."""
-    instructions = nbformat.v4.new_markdown_cell()
-    # TODO(denero) Force save.
-    instructions.source = "# Submit\nMake sure you have run all cells in your notebook in order before running the cell below, so that all images/graphs appear in the output.\n**Please save before submitting!**"
-    if instruction_text:
-        instructions.source += '\n\n' + instruction_text
-    if manual_questions:
-        n = len(manual_questions)
-        instructions.source += f'\n\n<!-- EXPECT {n} EXPORTED QUESTIONS -->'
+# def gen_submit_cells(nb_path, manual_questions, instruction_text):
+#     """Generate submit cells."""
+#     instructions = nbformat.v4.new_markdown_cell()
+#     # TODO(denero) Force save.
+#     instructions.source = "# Submit\nMake sure you have run all cells in your notebook in order before running the cell below, so that all images/graphs appear in the output.\n**Please save before submitting!**"
+#     if instruction_text:
+#         instructions.source += '\n\n' + instruction_text
+#     if manual_questions:
+#         n = len(manual_questions)
+#         instructions.source += f'\n\n<!-- EXPECT {n} EXPORTED QUESTIONS -->'
 
-    submit = nbformat.v4.new_code_cell()
-    source_lines = ["# Save your notebook first, then run this cell to submit."]
-    if manual_questions:
-        source_lines.append("import jassign.to_pdf")
-        source_lines.append("jassign.to_pdf.generate_pdf('{}', '{}')".format(
-            nb_path.name, nb_path.with_suffix('.pdf').name))
-    source_lines.append("ok.submit()")
-    submit.source = "\n".join(source_lines)
-    lock(instructions)
-    lock(submit)
-    return [instructions, submit]
+#     submit = nbformat.v4.new_code_cell()
+#     source_lines = ["# Save your notebook first, then run this cell to submit."]
+#     if manual_questions:
+#         source_lines.append("import jassign.to_pdf")
+#         source_lines.append("jassign.to_pdf.generate_pdf('{}', '{}')".format(
+#             nb_path.name, nb_path.with_suffix('.pdf').name))
+#     source_lines.append("ok.submit()")
+#     submit.source = "\n".join(source_lines)
+#     lock(instructions)
+#     lock(submit)
+#     return [instructions, submit]
 
 
 def gen_ok_cells(cells, tests_dir):
@@ -114,22 +120,36 @@ def gen_ok_cells(cells, tests_dir):
     question = {}
     processed_response = False
     tests = []
+    hidden_tests = []
     manual_questions = []
 
     for cell in cells:
         if question and not processed_response:
             assert not is_question_cell(cell), cell
             assert not is_test_cell(cell), cell
+            assert not is_solution_cell(cell) or is_markdown_solution_cell(cell), cell
+            if is_markdown_solution_cell(cell):
+                ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
             ok_cells.append(cell)
             processed_response = True
         elif question and processed_response and is_test_cell(cell):
-            tests.append(read_test(cell))
+            test = read_test(cell)
+            if test.hidden:
+                hidden_tests.append(test)
+            else:
+                tests.append(test)
+        elif question and processed_response and is_solution_cell(cell):
+            if is_markdown_solution_cell(cell):
+                ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
+            ok_cells.append(cell)
         else:
             if question and processed_response:
                 # The question is over
                 if tests:
                     ok_cells.append(gen_test_cell(question, tests, tests_dir))
-                question, processed_response, tests = {}, False, []
+                if hidden_tests:
+                    gen_test_cell(question, hidden_tests, tests_dir, hidden=True)
+                question, processed_response, tests, hidden_tests = {}, False, [], []
             if is_question_cell(cell):
                 question = read_question_metadata(cell)
                 manual = question.get('manual', False)
@@ -137,12 +157,18 @@ def gen_ok_cells(cells, tests_dir):
                 if manual:
                     manual_questions.append(question['name'])
                 ok_cells.append(gen_question_cell(cell, manual, format))
+            elif is_solution_cell(cell):
+                if is_markdown_solution_cell(cell):
+                    ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
+                ok_cells.append(cell)
             else:
                 assert not is_test_cell(cell), 'Test outside of a question: ' + str(cell)
                 ok_cells.append(cell)
 
     if tests:
         ok_cells.append(gen_test_cell(question, tests, tests_dir))
+    if hidden_tests:
+        gen_test_cell(question, hidden_tests, tests_dir, hidden=True)
 
     return ok_cells, manual_questions
 
@@ -162,6 +188,20 @@ def is_question_cell(cell):
     if cell['cell_type'] != 'markdown':
         return False
     return find_question_spec(get_source(cell)) is not None
+
+
+def is_markdown_solution_cell(cell):
+    source = get_source(cell)
+    return is_solution_cell and any([re.match(MD_SOLUTION_REGEX, l, flags=re.IGNORECASE) for l in source])
+
+
+def is_solution_cell(cell):
+    source = get_source(cell)
+    if cell['cell_type'] == 'markdown':
+        return source and any([re.match(MD_SOLUTION_REGEX, l, flags=re.IGNORECASE) for l in source])
+    elif cell['cell_type'] == 'code':
+        return source and re.match(SOLUTION_REGEX, source[0], flags=re.IGNORECASE)
+    return False
 
 
 def find_question_spec(source):
@@ -187,10 +227,10 @@ def gen_question_cell(cell, manual, format):
         end += 1
     source[start] = "<!--"
     source[end] = "-->"
-    if manual and format:
-        source.append(f'<!-- EXPORT TO PDF format:{format} -->')
-    elif manual:
-        source.append('<!-- EXPORT TO PDF -->')
+    # if manual and format:
+    #     source.append(f'<!-- EXPORT TO PDF format:{format} -->')
+    # elif manual:
+    #     source.append('<!-- EXPORT TO PDF -->')
     cell['source'] = '\n'.join(source)
     lock(cell)
     return cell
@@ -214,8 +254,8 @@ def is_test_cell(cell):
     if cell['cell_type'] != 'code':
         return False
     source = get_source(cell)
-    delimiters = COMMENT_PREFIX + ' \n'
-    return source and source[0].strip(delimiters) in TEST_HEADERS
+    # delimiters = COMMENT_PREFIX + ' \n'
+    return source and re.match(TEST_REGEX, source[0], flags=re.IGNORECASE)
 
 
 Test = namedtuple('Test', ['input', 'output', 'hidden'])
@@ -223,7 +263,7 @@ Test = namedtuple('Test', ['input', 'output', 'hidden'])
 
 def read_test(cell):
     """Return the contents of a test as an (input, output, hidden) tuple."""
-    hidden = 'HIDDEN' in get_source(cell)[0]
+    hidden = bool(re.search("hidden", get_source(cell)[0], flags=re.IGNORECASE))
     output = ''
     for o in cell['outputs']:
         output += ''.join(o.get('text', ''))
@@ -242,17 +282,24 @@ def write_test(path, test):
         pprint.pprint(test, f, indent=4)
 
 
-def gen_test_cell(question, tests, tests_dir):
+def gen_test_cell(question, tests, tests_dir, hidden=False):
     """Return a test cell."""
     cell = nbformat.v4.new_code_cell()
-    cell.source = ['ok.grade("{}");'.format(question['name'])]
+    if hidden:
+        cell.source = ['grader.check("{}")'.format(question['name'] + "H")]
+    else:
+        cell.source = ['grader.check("{}")'.format(question['name'])]
     suites = [gen_suite(tests)]
     test = {
         'name': question['name'],
         'points': question.get('points', 1),
+        'hidden': hidden,
         'suites': suites,
     }
-    write_test(tests_dir / (question['name'] + '.py'), test)
+    if hidden:
+        write_test(tests_dir / (question['name'] + "H" + '.py'), test)
+    else:
+        write_test(tests_dir / (question['name'] + '.py'), test)
     lock(cell)
     return cell
 
@@ -273,8 +320,9 @@ def gen_case(test):
     """Generate an ok test case for a test."""
     # TODO(denero) This should involve a Python parser, but it doesn't...
     code_lines = []
+    # print(test)
     for line in test.input.split('\n'):
-        if line.startswith(' '):
+        if re.match(r"\s", line):
             code_lines.append('... ' + line)
         else:
             code_lines.append('>>> ' + line)
@@ -349,8 +397,13 @@ def replace_solutions(lines):
 def strip_solutions(original_nb_path, stripped_nb_path):
     """Write a notebook with solutions stripped."""
     nb = nbformat.read(open(original_nb_path), NB_VERSION)
-    for cell in nb['cells']:
-        cell['source'] = '\n'.join(replace_solutions(get_source(cell)))
+    deletion_indices = []
+    for i in range(len(nb['cells'])):
+        if is_solution_cell(nb['cells'][i]):
+            deletion_indices.append(i)
+    deletion_indices.reverse()
+    for i in deletion_indices:
+        del nb['cells'][i]
     with open(stripped_nb_path, 'w') as f:
         nbformat.write(nb, f, NB_VERSION)
 
@@ -376,11 +429,13 @@ def remove_hidden_tests(test_dir):
         locals = {}
         exec(open(f).read(), globals(), locals)
         test = locals['test']
-        for suite in test['suites']:
-            for i, case in list(enumerate(suite['cases']))[::-1]:
-                if case['hidden']:
-                    suite['cases'].pop(i)
-        write_test(f, test)
+        if test['hidden']:
+            os.remove(f)
+        # for suite in test['suites']:
+        #     for i, case in list(enumerate(suite['cases']))[::-1]:
+        #         if case['hidden']:
+        #             suite['cases'].pop(i)
+        # write_test(f, test)
 
 
 def gen_views(master_nb, result_dir, args):
@@ -393,6 +448,7 @@ def gen_views(master_nb, result_dir, args):
     student_dir = result_dir / 'student'
     os.makedirs(autograder_dir, exist_ok=True)
     ok_nb_path = convert_to_ok(master_nb, autograder_dir, args)
+    shutil.rmtree(student_dir, ignore_errors=True)
     shutil.copytree(autograder_dir, student_dir)
     student_nb_path = student_dir / ok_nb_path.name
     os.remove(student_nb_path)
