@@ -38,6 +38,10 @@ def convert_to_ok(nb_path, dir, args):
     os.makedirs(tests_dir, exist_ok=True)
     # open(tests_dir / '__init__.py', 'a').close()
 
+    # copy files
+    for file in args.files:
+        shutil.copy(file, str(dir))
+
     nb = nbformat.read(open(nb_path), NB_VERSION)
     ok_cells, manual_questions = gen_ok_cells(nb['cells'], tests_dir)
 

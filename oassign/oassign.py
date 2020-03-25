@@ -29,7 +29,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("master", help="Notebook with solutions and tests.")
     parser.add_argument("result", help="Directory containing the result.")
-    parser.add_argument("endpoint", help="OK endpoint; e.g., cal/data8/sp19")
+    # parser.add_argument("endpoint", help="OK endpoint; e.g., cal/data8/sp19")
     parser.add_argument("--no-export-cell", help="Don't inject an export cell into the notebook",
                         default=False, action="store_true")
     parser.add_argument("--no-run-tests", help="Don't run tests.",
@@ -39,6 +39,7 @@ def parse_args():
     parser.add_argument("--no-filter", help="Don't filter the PDF.",
                         default=False, action="store_true")
     parser.add_argument("--instructions", help="Additional submission instructions for students")
+    parser.add_argument("files", nargs='*', help="Other support files needed for distribution (e.g. .py files, data files)")
     return parser.parse_args()
 
 
