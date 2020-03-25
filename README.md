@@ -64,7 +64,7 @@ If you get this error, this means that you have _more than one cell_ between the
 
 #### Test cell with a blank on the last line
 
-If your test contains a blank/newline after the test, jassign seems to automatically add a semicolon at the end of the test, thus, supressing the output of the command.
+If your test contains a blank/newline after the test, otter-assign seems to automatically add a semicolon at the end of the test, thus, supressing the output of the command.
 
 Example:
 
