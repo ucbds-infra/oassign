@@ -40,12 +40,16 @@ def convert_to_ok(nb_path, dir, args):
 
     nb = nbformat.read(open(nb_path), NB_VERSION)
     ok_cells, manual_questions = gen_ok_cells(nb['cells'], tests_dir)
-    # dot_ok_name = gen_dot_ok(ok_nb_path, args.endpoint)
-    # init = gen_init_cell(dot_ok_name)
 
-    nb['cells'] = ok_cells #[init] + ok_cells
-    # if not args.no_submit_cell:
-    #     nb['cells'] += gen_submit_cells(nb_path, manual_questions, args.instructions)
+    # dot_ok_name = gen_dot_ok(ok_nb_path, args.endpoint)
+    if not args.no_init_cell:
+        init = gen_init_cell()
+        nb['cells'] = [init] + ok_cells
+    else:
+        nb['cells'] = ok_cells #[init] + ok_cells
+
+    if not args.no_export_cell:
+        nb['cells'] += gen_export_cells(nb_path, manual_questions, args.instructions, filtering = not args.no_filter)
     remove_output(nb)
 
     with open(ok_nb_path, 'w') as f:
@@ -76,38 +80,43 @@ def convert_to_ok(nb_path, dir, args):
 #     return ok_path.name
 
 
-# def gen_init_cell(dot_ok_name):
-#     """Generate a cell to initialize ok object."""
-#     cell = nbformat.v4.new_code_cell()
-#     cell.source = ("# Initialize OK\n"
-#     "from client.api.notebook import Notebook\n"
-#     "ok = Notebook('{}')".format(dot_ok_name))
-#     lock(cell)
-#     return cell
+def gen_init_cell():
+    """Generate a cell to initialize ok object."""
+    cell = nbformat.v4.new_code_cell("# Initialize Otter\nimport otter\ngrader = otter.Notebook()")
+    lock(cell)
+    return cell
 
 
-# def gen_submit_cells(nb_path, manual_questions, instruction_text):
-#     """Generate submit cells."""
-#     instructions = nbformat.v4.new_markdown_cell()
-#     # TODO(denero) Force save.
-#     instructions.source = "# Submit\nMake sure you have run all cells in your notebook in order before running the cell below, so that all images/graphs appear in the output.\n**Please save before submitting!**"
-#     if instruction_text:
-#         instructions.source += '\n\n' + instruction_text
-#     if manual_questions:
-#         n = len(manual_questions)
-#         instructions.source += f'\n\n<!-- EXPECT {n} EXPORTED QUESTIONS -->'
+def gen_export_cells(nb_path, manual_questions, instruction_text, filtering=True):
+    """Generate submit cells."""
+    instructions = nbformat.v4.new_markdown_cell()
+    instructions.source = "## Submission\n\nMake sure you have run all cells in your notebook in order before \
+    running the cell below, so that all images/graphs appear in the output. **Please save before submitting!**"
+    
+    if instruction_text:
+        instructions.source += '\n\n' + instruction_text
+    
+    # if manual_questions:
+    #     n = len(manual_questions)
+    #     instructions.source += f'\n\n<!-- EXPECT {n} EXPORTED QUESTIONS -->'
 
-#     submit = nbformat.v4.new_code_cell()
-#     source_lines = ["# Save your notebook first, then run this cell to submit."]
-#     if manual_questions:
-#         source_lines.append("import jassign.to_pdf")
-#         source_lines.append("jassign.to_pdf.generate_pdf('{}', '{}')".format(
-#             nb_path.name, nb_path.with_suffix('.pdf').name))
-#     source_lines.append("ok.submit()")
-#     submit.source = "\n".join(source_lines)
-#     lock(instructions)
-#     lock(submit)
-#     return [instructions, submit]
+    export = nbformat.v4.new_code_cell()
+    source_lines = ["# Save your notebook first, then run this cell to export."]
+    if filtering:
+        source_lines.append(f"grader.export(\"{ nb_path.name }\")")
+    else:
+        source_lines.append(f"grader.export(\"{ nb_path.name }\", filtering=False)")
+    # if manual_questions:
+    #     source_lines.append("import jassign.to_pdf")
+    #     source_lines.append("jassign.to_pdf.generate_pdf('{}', '{}')".format(
+    #         nb_path.name, nb_path.with_suffix('.pdf').name))
+    # source_lines.append("ok.submit()")
+    export.source = "\n".join(source_lines)
+
+    lock(instructions)
+    lock(export)
+
+    return [instructions, export, nbformat.v4.new_markdown_cell(" ")]     # last cell is buffer
 
 
 def gen_ok_cells(cells, tests_dir):
@@ -124,6 +133,7 @@ def gen_ok_cells(cells, tests_dir):
     manual_questions = []
 
     for cell in cells:
+
         if question and not processed_response:
             assert not is_question_cell(cell), cell
             assert not is_test_cell(cell), cell
@@ -132,16 +142,19 @@ def gen_ok_cells(cells, tests_dir):
                 ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
             ok_cells.append(cell)
             processed_response = True
+
         elif question and processed_response and is_test_cell(cell):
             test = read_test(cell)
             if test.hidden:
                 hidden_tests.append(test)
             else:
                 tests.append(test)
+
         elif question and processed_response and is_solution_cell(cell):
             if is_markdown_solution_cell(cell):
                 ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
             ok_cells.append(cell)
+
         else:
             if question and processed_response:
                 # The question is over
@@ -149,7 +162,14 @@ def gen_ok_cells(cells, tests_dir):
                     ok_cells.append(gen_test_cell(question, tests, tests_dir))
                 if hidden_tests:
                     gen_test_cell(question, hidden_tests, tests_dir, hidden=True)
+
+                # add a cell with <!-- END QUESTION --> if a manually graded question
+                manual = question.get('manual', False)
+                if manual:
+                    ok_cells.append(gen_close_export_cell())
+                
                 question, processed_response, tests, hidden_tests = {}, False, [], []
+
             if is_question_cell(cell):
                 question = read_question_metadata(cell)
                 manual = question.get('manual', False)
@@ -157,10 +177,12 @@ def gen_ok_cells(cells, tests_dir):
                 if manual:
                     manual_questions.append(question['name'])
                 ok_cells.append(gen_question_cell(cell, manual, format))
+
             elif is_solution_cell(cell):
                 if is_markdown_solution_cell(cell):
                     ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
                 ok_cells.append(cell)
+
             else:
                 assert not is_test_cell(cell), 'Test outside of a question: ' + str(cell)
                 ok_cells.append(cell)
@@ -219,6 +241,8 @@ def gen_question_cell(cell, manual, format):
     """Return the cell with metadata hidden in an HTML comment."""
     cell = copy.deepcopy(cell)
     source = get_source(cell)
+    if manual:
+        source = ["<!-- BEGIN QUESTION -->", ""] + source
     begin_question_line = find_question_spec(source)
     start = begin_question_line - 1
     assert source[start].strip() == BLOCK_QUOTE
@@ -232,6 +256,13 @@ def gen_question_cell(cell, manual, format):
     # elif manual:
     #     source.append('<!-- EXPORT TO PDF -->')
     cell['source'] = '\n'.join(source)
+    lock(cell)
+    return cell
+
+
+def gen_close_export_cell():
+    """Returns a new cell to end question export"""
+    cell = nbformat.v4.new_markdown_cell("<!-- END QUESTION -->")
     lock(cell)
     return cell
 
@@ -338,60 +369,60 @@ def gen_case(test):
     }
 
 
-solution_assignment_re = re.compile('(\\s*[a-zA-Z0-9_ ]*=)(.*) #[ ]?SOLUTION')
-def solution_assignment_sub(match):
-    prefix = match.group(1)
-    sol = match.group(2)
-    return prefix + ' ...'
+# solution_assignment_re = re.compile('(\\s*[a-zA-Z0-9_ ]*=)(.*) #[ ]?SOLUTION')
+# def solution_assignment_sub(match):
+#     prefix = match.group(1)
+#     sol = match.group(2)
+#     return prefix + ' ...'
 
 
-solution_line_re = re.compile('(\\s*)([^#\n]+) #[ ]?SOLUTION')
-def solution_line_sub(match):
-    prefix = match.group(1)
-    return prefix + '...'
+# solution_line_re = re.compile('(\\s*)([^#\n]+) #[ ]?SOLUTION')
+# def solution_line_sub(match):
+#     prefix = match.group(1)
+#     return prefix + '...'
 
 
-text_solution_line_re = re.compile(r'\s*\*\*SOLUTION:?\*\*:?.*')
-begin_solution_re = re.compile(r'(\s*)# BEGIN SOLUTION( NO PROMPT)?')
-skip_suffixes = ['# SOLUTION NO PROMPT', '# BEGIN PROMPT', '# END PROMPT']
+# text_solution_line_re = re.compile(r'\s*\*\*SOLUTION:?\*\*:?.*')
+# begin_solution_re = re.compile(r'(\s*)# BEGIN SOLUTION( NO PROMPT)?')
+# skip_suffixes = ['# SOLUTION NO PROMPT', '# BEGIN PROMPT', '# END PROMPT']
 
 
-SUBSTITUTIONS = [
-    (solution_assignment_re, solution_assignment_sub),
-    (solution_line_re, solution_line_sub),
-]
+# SUBSTITUTIONS = [
+#     (solution_assignment_re, solution_assignment_sub),
+#     (solution_line_re, solution_line_sub),
+# ]
 
 
-def replace_solutions(lines):
-    """Replace solutions in lines, a list of strings."""
-    if text_solution_line_re.match(lines[0]):
-        return ['*Write your answer here, replacing this text.*']
-    stripped = []
-    solution = False
-    for line in lines:
-        if any(line.endswith(s) for s in skip_suffixes):
-            continue
-        if solution and not line.endswith('# END SOLUTION'):
-            continue
-        if line.endswith('# END SOLUTION'):
-            assert solution, 'END SOLUTION without BEGIN SOLUTION in ' + str(lines)
-            solution = False
-            continue
-        begin_solution = begin_solution_re.match(line)
-        if begin_solution:
-            assert not solution, 'Nested BEGIN SOLUTION in ' + str(lines)
-            solution = True
-            if not begin_solution.group(2):
-                line = begin_solution.group(1) + '...'
-            else:
-                continue
-        for exp, sub in SUBSTITUTIONS:
-            m = exp.match(line)
-            if m:
-                line = sub(m)
-        stripped.append(line)
-    assert not solution, 'BEGIN SOLUTION without END SOLUTION in ' + str(lines)
-    return stripped
+# def replace_solutions(lines):
+#     """Replace solutions in lines, a list of strings."""
+#     if text_solution_line_re.match(lines[0]):
+#         return ['*Write your answer here, replacing this text.*']
+#     stripped = []
+#     solution = False
+#     for line in lines:
+#         if any(line.endswith(s) for s in skip_suffixes):
+#             continue
+#         if solution and not line.endswith('# END SOLUTION'):
+#             continue
+#         if line.endswith('# END SOLUTION'):
+#             assert solution, 'END SOLUTION without BEGIN SOLUTION in ' + str(lines)
+#             solution = False
+#             continue
+#         begin_solution = begin_solution_re.match(line)
+#         if begin_solution:
+#             assert not solution, 'Nested BEGIN SOLUTION in ' + str(lines)
+#             solution = True
+#             if not begin_solution.group(2):
+#                 line = begin_solution.group(1) + '...'
+#             else:
+#                 continue
+#         for exp, sub in SUBSTITUTIONS:
+#             m = exp.match(line)
+#             if m:
+#                 line = sub(m)
+#         stripped.append(line)
+#     assert not solution, 'BEGIN SOLUTION without END SOLUTION in ' + str(lines)
+#     return stripped
 
 
 def strip_solutions(original_nb_path, stripped_nb_path):
