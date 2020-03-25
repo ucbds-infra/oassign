@@ -53,8 +53,11 @@ def convert_to_ok(nb_path, dir, args):
     else:
         nb['cells'] = ok_cells #[init] + ok_cells
 
+    if not args.no_check_all:
+        nb['cells'] += gen_check_all_cell()
     if not args.no_export_cell:
         nb['cells'] += gen_export_cells(nb_path, manual_questions, args.instructions, filtering = not args.no_filter)
+        
     remove_output(nb)
 
     with open(ok_nb_path, 'w') as f:
@@ -124,6 +127,19 @@ def gen_export_cells(nb_path, manual_questions, instruction_text, filtering=True
     return [instructions, export, nbformat.v4.new_markdown_cell(" ")]     # last cell is buffer
 
 
+def gen_check_all_cell():
+    """Generate submit cells."""
+    instructions = nbformat.v4.new_markdown_cell()
+    instructions.source = "To double-check your work, the cell below will rerun all of the autograder tests."
+
+    check_all = nbformat.v4.new_code_cell("grader.check_all()")
+
+    lock(instructions)
+    lock(check_all)
+
+    return [instructions, check_all]
+
+
 def gen_ok_cells(cells, tests_dir):
     """Generate notebook cells for the OK version of a master notebook.
 
@@ -159,7 +175,7 @@ def gen_ok_cells(cells, tests_dir):
                 tests.append(test)
 
         elif question and processed_response and is_solution_cell(cell):
-            if is_markdown_solution_cell(cell):
+            if is_markdown_solution_cell(cell) and not md_has_prompt:
                 ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
             ok_cells.append(cell)
 
@@ -318,7 +334,7 @@ def write_test(path, test):
     """Write an OK test file."""
     with open(path, 'w') as f:
         f.write('test = ')
-        pprint.pprint(test, f, indent=4)
+        pprint.pprint(test, f, indent=4, width=200, depth=None)
 
 
 def gen_test_cell(question, tests, tests_dir, hidden=False):
@@ -329,9 +345,32 @@ def gen_test_cell(question, tests, tests_dir, hidden=False):
     else:
         cell.source = ['grader.check("{}")'.format(question['name'])]
     suites = [gen_suite(tests)]
+
+    # if both keys, use those values
+    if 'public_points' in question and 'private_points' in question:
+        if hidden:
+            points = question['private_points']
+        else:
+            points = question['public_points']
+
+    # if only public points, assume public & private worth same
+    elif 'public_points' in question:
+        points = question['public_points']
+
+    # if only private, assume public worth 0 points
+    elif 'private_points' in question:
+        if hidden:
+            points = question['private_points']
+        else:
+            points = 0
+
+    # else get points and default to 1 if not presnet
+    else:
+        points = question.get('points', 1)
+    
     test = {
         'name': question['name'],
-        'points': question.get('points', 1),
+        'points': points,
         'hidden': hidden,
         'suites': suites,
     }
@@ -359,15 +398,16 @@ def gen_case(test):
     """Generate an ok test case for a test."""
     # TODO(denero) This should involve a Python parser, but it doesn't...
     code_lines = []
-    # print(test)
+    last_end_escape = False
     for line in test.input.split('\n'):
-        if re.match(r"\s", line):
+        if re.match(r"\s", line) or last_end_escape:
             code_lines.append('... ' + line)
         else:
             code_lines.append('>>> ' + line)
+        last_end_escape = line.endswith("\\")
     # Suppress intermediate output from evaluation
     for i in range(len(code_lines) - 1):
-        if code_lines[i+1].startswith('>>>') and len(code_lines[i].strip()) > 3:
+        if code_lines[i+1].startswith('>>>') and len(code_lines[i].strip()) > 3 and not code_lines[i].endswith("\\"):
             code_lines[i] += ';'
     code_lines.append(test.output)
     return {

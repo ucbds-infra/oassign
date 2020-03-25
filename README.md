@@ -90,6 +90,11 @@ Turns into the following failed test in the students' notebook:
 
 ## Changelog
 
+**v0.0.3:**
+
+* Added logging of results when tests fail
+* Changed public/private test point behavior
+
 **v0.0.2:**
 
 * Added custom prompts for manually graded questions

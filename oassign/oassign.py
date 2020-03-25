@@ -7,6 +7,7 @@ from otter.grade import grade_notebook
 from glob import glob
 import sys
 import os
+from pprint import pformat
 
 try:
     from .to_ok import gen_views
@@ -36,6 +37,8 @@ def parse_args(args=None):
                         default=False, action="store_true")
     parser.add_argument("--no-init-cell", help="Don't automatically generate an Otter init cell",
                         default=False, action="store_true")
+    parser.add_argument("--no-check-all", help="Don't automatically add a check_all cell",
+                        default=False, action="store_true")
     parser.add_argument("--no-filter", help="Don't filter the PDF.",
                         default=False, action="store_true")
     parser.add_argument("--instructions", help="Additional submission instructions for students")
@@ -49,7 +52,7 @@ def parse_args(args=None):
 def run_tests(nb_path):
     """Run tests in the autograder version of the notebook."""
     results = grade_notebook(nb_path, glob(str(nb_path.parent / "tests" / "*.py")))
-    assert results["total"] == results["possible"], "Some autograder tests failed"
+    assert results["total"] == results["possible"], "Some autograder tests failed:\n\n" + pformat(results, indent=2)
 
 
 def main(args=None):
