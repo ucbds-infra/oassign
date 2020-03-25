@@ -136,6 +136,7 @@ def gen_ok_cells(cells, tests_dir):
     tests = []
     hidden_tests = []
     manual_questions = []
+    md_has_prompt = False
 
     for cell in cells:
 
@@ -143,7 +144,9 @@ def gen_ok_cells(cells, tests_dir):
             assert not is_question_cell(cell), cell
             assert not is_test_cell(cell), cell
             assert not is_solution_cell(cell) or is_markdown_solution_cell(cell), cell
-            if is_markdown_solution_cell(cell):
+            if not is_solution_cell(cell) and question.get('manual', False):
+                md_has_prompt = True
+            elif is_markdown_solution_cell(cell) and not md_has_prompt:
                 ok_cells.append(nbformat.v4.new_markdown_cell(MD_ANSWER_CELL_TEMPLATE))
             ok_cells.append(cell)
             processed_response = True
@@ -173,7 +176,7 @@ def gen_ok_cells(cells, tests_dir):
                 if manual:
                     ok_cells.append(gen_close_export_cell())
                 
-                question, processed_response, tests, hidden_tests = {}, False, [], []
+                question, processed_response, tests, hidden_tests, md_has_prompt = {}, False, [], [], False
 
             if is_question_cell(cell):
                 question = read_question_metadata(cell)

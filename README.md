@@ -87,3 +87,11 @@ Turns into the following failed test in the students' notebook:
 ```
 
 **SOLUTION**: remove the blank line at the end of the `# TEST` cell.
+
+## Changelog
+
+**v0.0.2:**
+
+* Added custom prompts for manually graded questions
+
+**v0.0.1:** Initial release

@@ -11,7 +11,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="otter-assign",
-    version="0.0.1",
+    version="0.0.2",
     author="Chris Pyles",
     author_email="cpyles@berkeley.edu",
     description="Jupyter notebook assignment formatting and distribution for Otter-Grader",
