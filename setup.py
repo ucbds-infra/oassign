@@ -32,6 +32,6 @@ setuptools.setup(
         ]
     },
     install_requires = [
-        "pyyaml", "nbformat", "ipython", "nbconvert", "tqdm", "setuptools", "otter-grader"
+        "pyyaml", "nbformat", "ipython", "nbconvert", "tqdm", "setuptools", "otter-grader", "pandas"
     ],
 )
