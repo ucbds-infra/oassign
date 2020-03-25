@@ -17,7 +17,8 @@ class TestConversion(unittest.TestCase):
         self.assertEqual(len(os.listdir("test/output/autograder")), 3)
         for f in ["tests", "data.csv", "example.ipynb"]:
             self.assertIn(f, os.listdir("test/output/autograder"))
-        self.assertEqual(os.listdir("test/output/autograder/tests"), ["q1H.py", "q1.py", "q3.py"])
+        for f in ["q1H.py", "q1.py", "q3.py"]:
+            self.assertIn(f, os.listdir("test/output/autograder/tests"))
 
         for file in ["example.ipynb", "data.csv", "tests/q1.py", "tests/q1H.py", "tests/q3.py"]:
             with open(os.path.join("test/output-correct/autograder", file)) as f:
@@ -30,7 +31,8 @@ class TestConversion(unittest.TestCase):
         self.assertEqual(len(os.listdir("test/output/student")), 3)
         for f in ["tests", "data.csv", "example.ipynb"]:
             self.assertIn(f, os.listdir("test/output/student"))
-        self.assertEqual(os.listdir("test/output/student/tests"), ["q1.py", "q3.py"])
+        for f in ["q1.py", "q3.py"]:
+            self.assertIn(f, os.listdir("test/output/student/tests"))
 
         for file in ["example.ipynb", "data.csv", "tests/q1.py", "tests/q3.py"]:
             with open(os.path.join("test/output-correct/student", file)) as f:
