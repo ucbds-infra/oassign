@@ -17,16 +17,16 @@ Otter, which is Python based. Contributions to
 support other testing frameworks, such as nbgrader and other programming
 languages, are welcome.
 
-An example notebook appears in `tests/example.ipynb`, which uses the [notebook
+An example notebook appears in `test/example.ipynb`, which uses the [notebook
 format](docs/notebook-format.md). To convert it, run:
 
 ```
-oassign tests/example.ipynb tests/output
+oassign test/example.ipynb test/output
 ```
 
 
-* `tests/example.ipynb`: an example notebook path that you'll need to replace with the _path to the master solution notebook_, which was augmented with the metadata and commands from the [notebook format](docs/notebook-format.md).
-* `tests/output`: _the path to where the output will be stored_ 
+* `test/example.ipynb`: an example notebook path that you'll need to replace with the _path to the master solution notebook_, which was augmented with the metadata and commands from the [notebook format](docs/notebook-format.md).
+* `test/output`: _the path to where the output will be stored_ 
   * the output contains two directories `autograder` and `student`
   * the `autograder` directory contains the full set of tests and a solution notebook (a solution notebook is different from the master notebook, because it is not formatted accordidng to the [notebook format](docs/notebook-format.md) but instead looks like the student notebook with solutions)
   * the `student` directory contains an automatically created redacted version. 

@@ -25,7 +25,7 @@ def enablePrint():
 	"""
 	sys.stdout = sys.__stdout__
 
-def parse_args():
+def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("master", help="Notebook with solutions and tests.")
     parser.add_argument("result", help="Directory containing the result.")
@@ -40,7 +40,10 @@ def parse_args():
                         default=False, action="store_true")
     parser.add_argument("--instructions", help="Additional submission instructions for students")
     parser.add_argument("files", nargs='*', help="Other support files needed for distribution (e.g. .py files, data files)")
-    return parser.parse_args()
+    if args is None:
+        return parser.parse_args()
+    else:
+        return parser.parse_args(args)
 
 
 def run_tests(nb_path):
@@ -49,8 +52,8 @@ def run_tests(nb_path):
     assert results["total"] == results["possible"], "Some autograder tests failed"
 
 
-def main():
-    args = parse_args()
+def main(args=None):
+    args = parse_args(args=args)
     master, result = pathlib.Path(args.master), pathlib.Path(args.result)
     print("Generating views...")
     gen_views(master, result, args)

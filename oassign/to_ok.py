@@ -42,7 +42,8 @@ def convert_to_ok(nb_path, dir, args):
     for file in args.files:
         shutil.copy(file, str(dir))
 
-    nb = nbformat.read(open(nb_path), NB_VERSION)
+    with open(nb_path) as f:
+        nb = nbformat.read(f, NB_VERSION)
     ok_cells, manual_questions = gen_ok_cells(nb['cells'], tests_dir)
 
     # dot_ok_name = gen_dot_ok(ok_nb_path, args.endpoint)
@@ -431,7 +432,8 @@ def gen_case(test):
 
 def strip_solutions(original_nb_path, stripped_nb_path):
     """Write a notebook with solutions stripped."""
-    nb = nbformat.read(open(original_nb_path), NB_VERSION)
+    with open(original_nb_path) as f:
+        nb = nbformat.read(f, NB_VERSION)
     deletion_indices = []
     for i in range(len(nb['cells'])):
         if is_solution_cell(nb['cells'][i]):
@@ -462,7 +464,8 @@ def remove_hidden_tests(test_dir):
         if f.name == '__init__.py' or f.suffix != '.py':
             continue
         locals = {}
-        exec(open(f).read(), globals(), locals)
+        with open(f) as f2:
+            exec(f2.read(), globals(), locals)
         test = locals['test']
         if test['hidden']:
             os.remove(f)
